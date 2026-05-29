@@ -177,6 +177,16 @@ def inject_css() -> None:
 # ── Data layer ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600)
 def fetch_ticker_data(ticker: str) -> dict:
+    # ── DEBUG: show raw yfinance response on cloud ──────────────────────────
+    try:
+        _dbg = yf.Ticker("AAPL", session=_YF_SESSION)
+        _dbg_info = _dbg.info
+        st.warning("🐛 DEBUG — AAPL .info keys: " + str(list(_dbg_info.keys())[:10]))
+        st.write("🐛 DEBUG — AAPL .info sample:", {k: _dbg_info[k] for k in list(_dbg_info.keys())[:5]})
+    except Exception as _dbg_err:
+        st.error(f"🐛 DEBUG — AAPL fetch failed: {type(_dbg_err).__name__}: {_dbg_err}")
+    # ── END DEBUG ────────────────────────────────────────────────────────────
+
     t = yf.Ticker(ticker.upper(), session=_YF_SESSION)
     data: dict = {}
     fetches = [
