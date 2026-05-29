@@ -1,8 +1,6 @@
 streamlit
-yfinance
 plotly
 pandas
 numpy
 requests
 openpyxl
-curl_cffi
