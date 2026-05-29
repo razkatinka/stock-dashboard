@@ -5,6 +5,10 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime
 import io
+import curl_cffi.requests as curl_requests
+
+# Shared curl_cffi session — bypasses Yahoo Finance cloud-IP blocks
+_YF_SESSION = curl_requests.Session(impersonate="chrome")
 
 # ── Colors ──────────────────────────────────────────────────────────────────
 BG_MAIN = "#0D1B2A"
@@ -173,7 +177,7 @@ def inject_css() -> None:
 # ── Data layer ───────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600)
 def fetch_ticker_data(ticker: str) -> dict:
-    t = yf.Ticker(ticker.upper())
+    t = yf.Ticker(ticker.upper(), session=_YF_SESSION)
     data: dict = {}
     fetches = [
         ("info",                  lambda: t.info),
@@ -200,7 +204,7 @@ def fetch_peer_data(peers: tuple) -> dict:
     result = {}
     for p in peers:
         try:
-            result[p] = yf.Ticker(p).info
+            result[p] = yf.Ticker(p, session=_YF_SESSION).info
         except Exception:
             result[p] = {}
     return result
@@ -211,7 +215,7 @@ def fetch_ytd_history(tickers: tuple) -> dict:
     result = {}
     for t in tickers:
         try:
-            h = yf.Ticker(t).history(period="ytd")
+            h = yf.Ticker(t, session=_YF_SESSION).history(period="ytd")
             if h is not None and len(h) > 1:
                 result[t] = h["Close"]
         except Exception:
