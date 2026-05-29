@@ -9,7 +9,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 # ── FMP config ────────────────────────────────────────────────────────────────
-FMP_BASE = "https://financialmodelingprep.com/api/v3"
+FMP_BASE = "https://financialmodelingprep.com/stable"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 BG_MAIN = "#0D1B2A"
@@ -189,8 +189,14 @@ def _fmp_get(endpoint: str, api_key: str):
 
 # ── FMP data normalization ────────────────────────────────────────────────────
 def _build_history_df(hist_data) -> pd.DataFrame:
-    """Convert FMP historical-price-full response to DataFrame with Close column."""
-    historical = hist_data.get("historical", []) if isinstance(hist_data, dict) else []
+    """Convert FMP historical price response to DataFrame with Close column.
+    Handles both stable API (returns list) and legacy format (returns {"historical":[...]})."""
+    if isinstance(hist_data, dict):
+        historical = hist_data.get("historical", [])
+    elif isinstance(hist_data, list):
+        historical = hist_data
+    else:
+        historical = []
     if not historical:
         return pd.DataFrame()
     records = [{"date": h["date"], "Close": h["close"]}
@@ -434,19 +440,19 @@ def fetch_ticker_data(ticker: str) -> dict:
     def get(endpoint):
         return _fmp_get(endpoint, api_key)
 
-    # ── Fetch all endpoints ───────────────────────────────────────────────────
-    profile_data  = get(f"profile/{t}")                                          or []
-    income_annual = get(f"income-statement/{t}?limit=4")                         or []
-    income_qtrly  = get(f"income-statement/{t}?period=quarter&limit=8")          or []
-    balance       = get(f"balance-sheet-statement/{t}?limit=4")                  or []
-    cashflow      = get(f"cash-flow-statement/{t}?limit=4")                      or []
-    key_metrics   = get(f"key-metrics/{t}?limit=1")                              or []
-    ratios        = get(f"ratios/{t}?limit=1")                                   or []
-    estimates     = get(f"analyst-estimates/{t}?limit=2")                        or []
-    price_tgts    = get(f"price-target/{t}?limit=20")                            or []
-    institutional = get(f"institutional-holder/{t}")                              or []
-    analyst_recs  = get(f"analyst-stock-recommendations/{t}?limit=4")            or []
-    hist_raw      = get(f"historical-price-full/{t}?from={one_year_ago}&serietype=line") or {}
+    # ── Fetch all endpoints (stable API: query-param style) ──────────────────
+    profile_data  = get(f"profile?symbol={t}")                                             or []
+    income_annual = get(f"income-statement?symbol={t}&period=annual&limit=4")             or []
+    income_qtrly  = get(f"income-statement?symbol={t}&period=quarter&limit=8")            or []
+    balance       = get(f"balance-sheet-statement?symbol={t}&period=annual&limit=4")      or []
+    cashflow      = get(f"cash-flow-statement?symbol={t}&period=annual&limit=4")          or []
+    key_metrics   = get(f"key-metrics?symbol={t}&period=annual&limit=1")                  or []
+    ratios        = get(f"ratios?symbol={t}&period=annual&limit=1")                       or []
+    estimates     = get(f"analyst-estimates?symbol={t}&limit=2")                          or []
+    price_tgts    = get(f"price-target?symbol={t}&limit=20")                              or []
+    institutional = get(f"institutional-holder?symbol={t}")                                or []
+    analyst_recs  = get(f"analyst-stock-recommendations?symbol={t}&limit=4")              or []
+    hist_raw      = get(f"historical-price-eod?symbol={t}&from={one_year_ago}")           or []
 
     # ── Build DataFrames ──────────────────────────────────────────────────────
     history_1y  = _build_history_df(hist_raw)
@@ -474,9 +480,9 @@ def fetch_peer_data(peers: tuple) -> dict:
     result = {}
     for p in peers:
         try:
-            profile = _fmp_get(f"profile/{p}", api_key)          or []
-            km      = _fmp_get(f"key-metrics/{p}?limit=1", api_key) or []
-            ra      = _fmp_get(f"ratios/{p}?limit=1", api_key)    or []
+            profile = _fmp_get(f"profile?symbol={p}", api_key)                      or []
+            km      = _fmp_get(f"key-metrics?symbol={p}&period=annual&limit=1", api_key) or []
+            ra      = _fmp_get(f"ratios?symbol={p}&period=annual&limit=1", api_key)      or []
             pinfo: dict = {}
             if profile:
                 pr = profile[0]
@@ -513,8 +519,8 @@ def fetch_ytd_history(tickers: tuple) -> dict:
     for t in tickers:
         try:
             fmp_sym = _FMP_SYMBOL_MAP.get(t, t)
-            raw     = _fmp_get(f"historical-price-full/{fmp_sym}?from={ytd_start}&serietype=line", api_key)
-            df      = _build_history_df(raw or {})
+            raw     = _fmp_get(f"historical-price-eod?symbol={fmp_sym}&from={ytd_start}", api_key)
+            df      = _build_history_df(raw or [])
             if df is not None and len(df) > 1:
                 result[t] = df["Close"]     # keyed by original ticker (^IXIC etc.)
         except Exception:
