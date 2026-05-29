@@ -411,6 +411,20 @@ def _normalize_info(profile, income_annual, balance, cashflow,
 
 
 # ── Data layer (FMP) ──────────────────────────────────────────────────────────
+def debug_fmp_connection() -> None:
+    """Run outside @st.cache_data so st.* calls actually render."""
+    api_key = os.environ.get("FMP_API_KEY", "")
+    key_preview = (api_key[:4] + "…") if len(api_key) >= 4 else f"(empty, len={len(api_key)})"
+    st.info(f"🐛 FMP_API_KEY starts with: `{key_preview}`")
+    try:
+        url  = f"https://financialmodelingprep.com/api/v3/profile/AAPL?apikey={api_key}"
+        resp = requests.get(url, timeout=15)
+        st.warning(f"🐛 FMP /profile/AAPL → HTTP {resp.status_code}")
+        st.code(resp.text[:2000], language="json")
+    except Exception as err:
+        st.error(f"🐛 requests.get failed: {type(err).__name__}: {err}")
+
+
 @st.cache_data(ttl=3600)
 def fetch_ticker_data(ticker: str) -> dict:
     api_key = os.environ.get("FMP_API_KEY", "")
@@ -1469,6 +1483,8 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         return
+
+    debug_fmp_connection()   # ← DEBUG: remove once API is confirmed working
 
     with st.spinner(f"טוען נתונים עבור {active_ticker}..."):
         data = fetch_ticker_data(active_ticker)
